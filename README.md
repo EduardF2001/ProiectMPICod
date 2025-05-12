@@ -224,9 +224,6 @@ int main(int argc, char** argv) {
 
 DP
 
-
-
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -241,7 +238,6 @@ using namespace std;
 
 using Clause = set<int>;
 using CNF = vector<Clause>;
-
 
 int variables_eliminated = 0;
 
@@ -268,13 +264,14 @@ bool parseDIMACS(const string& filename, CNF& formula, int& num_vars) {
             while (iss >> literal && literal != 0) {
                 clause.insert(literal);
             }
-            formula.push_back(clause);
+            if (!clause.empty()) {
+                formula.push_back(clause);
+            }
         }
     }
 
     return true;
 }
-
 
 set<int> getVariables(const CNF& formula) {
     set<int> vars;
@@ -285,11 +282,9 @@ set<int> getVariables(const CNF& formula) {
     return vars;
 }
 
-
 CNF resolveOnVar(const CNF& formula, int var) {
     CNF result;
     vector<Clause> pos, neg;
-
 
     for (const auto& clause : formula) {
         if (clause.count(var))
@@ -300,7 +295,6 @@ CNF resolveOnVar(const CNF& formula, int var) {
             result.push_back(clause);
     }
 
-
     for (const auto& c1 : pos) {
         for (const auto& c2 : neg) {
             Clause res;
@@ -308,7 +302,6 @@ CNF resolveOnVar(const CNF& formula, int var) {
                 if (lit != var) res.insert(lit);
             for (int lit : c2)
                 if (lit != -var) res.insert(lit);
-
 
             bool tautology = false;
             for (int lit : res) {
@@ -326,17 +319,37 @@ CNF resolveOnVar(const CNF& formula, int var) {
     return result;
 }
 
-
 bool dpSolve(CNF formula) {
+    int steps = 0;
+    cout << "Starting Davis-Putnam Resolution..." << endl;
+
     while (true) {
-        if (formula.empty()) return true;
-        for (const auto& clause : formula)
-            if (clause.empty()) return false;
+        steps++;
+        if (steps > 10000) {
+            cerr << "Aborting: Too many resolution steps (possible infinite loop)." << endl;
+            return false;
+        }
+
+        if (formula.empty()) {
+            cout << "All clauses eliminated." << endl;
+            return true;
+        }
+
+        for (const auto& clause : formula) {
+            if (clause.empty()) {
+                cout << "Found empty clause." << endl;
+                return false;
+            }
+        }
 
         set<int> vars = getVariables(formula);
-        if (vars.empty()) return true;
+        if (vars.empty()) {
+            cout << "No more variables left." << endl;
+            return true;
+        }
 
         int var = *vars.begin();
+        cout << "Resolving on variable: " << var << " (step " << steps << ")" << endl;
         formula = resolveOnVar(formula, var);
     }
 }
@@ -345,11 +358,15 @@ int main() {
     CNF formula;
     int num_vars;
 
-    string filename = "C:\\Users\\pc 10\\Desktop\\DPLL-MPI\\Example.cnf.txt";
+    string filename = "C:\\Users\\pc 10\\Desktop\\DPLL-MPI\\MpiDL\\Example.cnf.txt";
+
+    cout << "Reading file: " << filename << endl;
 
     if (!parseDIMACS(filename, formula, num_vars)) {
         return 1;
     }
+
+    cout << "CNF parsed. Clauses: " << formula.size() << ", Variables (declared): " << num_vars << endl;
 
     auto start = chrono::high_resolution_clock::now();
     bool result = dpSolve(formula);
@@ -357,16 +374,15 @@ int main() {
 
     chrono::duration<double> elapsed = end - start;
 
+    cout << "\n==============================\n";
     cout << (result ? "SATISFIABLE" : "UNSATISFIABLE") << endl;
-
-
-    cout << fixed << setprecision(6);
-    cout << "Time taken: " << elapsed.count() << " seconds" << endl;
-
+    cout << "Time taken: " << fixed << setprecision(6) << elapsed.count() << " seconds" << endl;
     cout << "Variables eliminated: " << variables_eliminated << endl;
+    cout << "==============================\n";
 
     return 0;
 }
+
 
 
 
